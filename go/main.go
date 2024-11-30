@@ -12,7 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -38,7 +38,7 @@ var (
 	ErrUnauthorized             error = fmt.Errorf("unauthorized user")
 	ErrForbidden                error = fmt.Errorf("forbidden")
 	ErrGeneratePassword         error = fmt.Errorf("failed to password hash") //nolint:deadcode
-	uniqueId                    sync.Map
+	generatedId                 *int64
 )
 
 const (
@@ -634,7 +634,7 @@ func initialize(c echo.Context) error {
 		c.Logger().Errorf("Failed to initialize %s: %v", string(out), err)
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
-	uniqueId.Store("", id)
+	generatedId = &id
 
 	return successResponse(c, &InitializeResponse{
 		Language: "go",
@@ -1879,14 +1879,9 @@ func noContentResponse(c echo.Context, status int) error {
 
 // generateID ユニークなIDを生成する
 func (h *Handler) generateID() (int64, error) {
-	var id int64
-	v, ok := uniqueId.Load("")
-	if ok {
-		id = v.(int64)
-	}
-	uniqueId.Store("", id+1)
+	atomic.AddInt64(generatedId, 1)
 
-	return id + 1, nil
+	return *generatedId, nil
 	// var updateErr error
 	// for i := 0; i < 100; i++ {
 	// 	res, err := h.DB.Exec("UPDATE id_generator SET id=LAST_INSERT_ID(id+1)")

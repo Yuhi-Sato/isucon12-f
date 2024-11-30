@@ -12,9 +12,9 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 	"time"
 
-	"github.com/catatsuy/cache"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
@@ -37,7 +37,7 @@ var (
 	ErrUnauthorized             error = fmt.Errorf("unauthorized user")
 	ErrForbidden                error = fmt.Errorf("forbidden")
 	ErrGeneratePassword         error = fmt.Errorf("failed to password hash") //nolint:deadcode
-	uniqueId                          = cache.NewWriteHeavyCache[string, int64]()
+	uniqueId                    sync.Map
 )
 
 const (
@@ -633,7 +633,7 @@ func initialize(c echo.Context) error {
 		c.Logger().Errorf("Failed to initialize %s: %v", string(out), err)
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
-	uniqueId.Set("", id)
+	uniqueId.Store("", id)
 
 	return successResponse(c, &InitializeResponse{
 		Language: "go",
@@ -1866,8 +1866,12 @@ func noContentResponse(c echo.Context, status int) error {
 
 // generateID ユニークなIDを生成する
 func (h *Handler) generateID() (int64, error) {
-	id, _ := uniqueId.Get("")
-	uniqueId.Set("", id+1)
+	var id int64
+	v, ok := uniqueId.Load("")
+	if ok {
+		id = v.(int64)
+	}
+	uniqueId.Store("", id+1)
 
 	return id + 1, nil
 	// var updateErr error

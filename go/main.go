@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
+	"github.com/catatsuy/cache"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
@@ -37,6 +37,7 @@ var (
 	ErrUnauthorized             error = fmt.Errorf("unauthorized user")
 	ErrForbidden                error = fmt.Errorf("forbidden")
 	ErrGeneratePassword         error = fmt.Errorf("failed to password hash") //nolint:deadcode
+	uniqueId                          = cache.NewWriteHeavyCache[string, int64]()
 )
 
 const (
@@ -626,6 +627,13 @@ func initialize(c echo.Context) error {
 		c.Logger().Errorf("Failed to initialize %s: %v", string(out), err)
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
+
+	var id int64
+	if err = dbx.Get(&id, "SELECT id FROM id_generator"); err != nil {
+		c.Logger().Errorf("Failed to initialize %s: %v", string(out), err)
+		return errorResponse(c, http.StatusInternalServerError, err)
+	}
+	uniqueId.Set("", id)
 
 	return successResponse(c, &InitializeResponse{
 		Language: "go",
@@ -1858,25 +1866,29 @@ func noContentResponse(c echo.Context, status int) error {
 
 // generateID ユニークなIDを生成する
 func (h *Handler) generateID() (int64, error) {
-	var updateErr error
-	for i := 0; i < 100; i++ {
-		res, err := h.DB.Exec("UPDATE id_generator SET id=LAST_INSERT_ID(id+1)")
-		if err != nil {
-			if merr, ok := err.(*mysql.MySQLError); ok && merr.Number == 1213 {
-				updateErr = err
-				continue
-			}
-			return 0, err
-		}
+	id, _ := uniqueId.Get("")
+	uniqueId.Set("", id+1)
 
-		id, err := res.LastInsertId()
-		if err != nil {
-			return 0, err
-		}
-		return id, nil
-	}
+	return id + 1, nil
+	// var updateErr error
+	// for i := 0; i < 100; i++ {
+	// 	res, err := h.DB.Exec("UPDATE id_generator SET id=LAST_INSERT_ID(id+1)")
+	// 	if err != nil {
+	// 		if merr, ok := err.(*mysql.MySQLError); ok && merr.Number == 1213 {
+	// 			updateErr = err
+	// 			continue
+	// 		}
+	// 		return 0, err
+	// 	}
 
-	return 0, fmt.Errorf("failed to generate id: %w", updateErr)
+	// 	id, err := res.LastInsertId()
+	// 	if err != nil {
+	// 		return 0, err
+	// 	}
+	// 	return id, nil
+	// }
+
+	// return 0, fmt.Errorf("failed to generate id: %w", updateErr)
 }
 
 // generateUUID UUIDの生成

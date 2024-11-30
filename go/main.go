@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -39,6 +40,7 @@ var (
 	ErrForbidden                error = fmt.Errorf("forbidden")
 	ErrGeneratePassword         error = fmt.Errorf("failed to password hash") //nolint:deadcode
 	generatedId                 *int64
+	gm                          sync.Mutex
 )
 
 const (
@@ -1879,6 +1881,9 @@ func noContentResponse(c echo.Context, status int) error {
 
 // generateID ユニークなIDを生成する
 func (h *Handler) generateID() (int64, error) {
+	gm.Lock()
+	defer gm.Unlock()
+
 	atomic.AddInt64(generatedId, 1)
 
 	return *generatedId, nil

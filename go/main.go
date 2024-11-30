@@ -370,8 +370,9 @@ func (h *Handler) obtainLoginBonus(tx *sqlx.Tx, userID int64, requestAt int64) (
 				return nil, err
 			}
 			initBonus = true
-
+			gm.Lock()
 			ubID, err := h.generateID()
+			gm.Unlock()
 			if err != nil {
 				return nil, err
 			}
@@ -454,8 +455,9 @@ func (h *Handler) obtainPresent(tx *sqlx.Tx, userID int64, requestAt int64) ([]*
 		if err != sql.ErrNoRows {
 			return nil, err
 		}
-
+		gm.Lock()
 		pID, err := h.generateID()
+		gm.Unlock()
 		if err != nil {
 			return nil, err
 		}
@@ -474,8 +476,9 @@ func (h *Handler) obtainPresent(tx *sqlx.Tx, userID int64, requestAt int64) ([]*
 		if _, err := tx.Exec(query, up.ID, up.UserID, up.SentAt, up.ItemType, up.ItemID, up.Amount, up.PresentMessage, up.CreatedAt, up.UpdatedAt); err != nil {
 			return nil, err
 		}
-
+		gm.Lock()
 		phID, err := h.generateID()
+		gm.Unlock()
 		if err != nil {
 			return nil, err
 		}
@@ -539,8 +542,9 @@ func (h *Handler) obtainItem(tx *sqlx.Tx, userID, itemID int64, itemType int, ob
 			}
 			return nil, nil, nil, err
 		}
-
+		gm.Lock()
 		cID, err := h.generateID()
+		gm.Unlock()
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -580,7 +584,9 @@ func (h *Handler) obtainItem(tx *sqlx.Tx, userID, itemID int64, itemType int, ob
 		}
 
 		if uitem == nil {
+			gm.Lock()
 			uitemID, err := h.generateID()
+			gm.Unlock()
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -672,7 +678,9 @@ func (h *Handler) createUser(c echo.Context) error {
 	defer tx.Rollback() //nolint:errcheck
 
 	// ユーザ作成
+	gm.Lock()
 	uID, err := h.generateID()
+	gm.Unlock()
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
@@ -689,8 +697,9 @@ func (h *Handler) createUser(c echo.Context) error {
 	if _, err = tx.Exec(query, user.ID, user.LastActivatedAt, user.RegisteredAt, user.LastGetRewardAt, user.CreatedAt, user.UpdatedAt); err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
-
+	gm.Lock()
 	udID, err := h.generateID()
+	gm.Unlock()
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
@@ -720,7 +729,9 @@ func (h *Handler) createUser(c echo.Context) error {
 
 	initCards := make([]*UserCard, 0, 3)
 	for i := 0; i < 3; i++ {
+		gm.Lock()
 		cID, err := h.generateID()
+		gm.Unlock()
 		if err != nil {
 			return errorResponse(c, http.StatusInternalServerError, err)
 		}
@@ -741,7 +752,9 @@ func (h *Handler) createUser(c echo.Context) error {
 		initCards = append(initCards, card)
 	}
 
+	gm.Lock()
 	deckID, err := h.generateID()
+	gm.Unlock()
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
@@ -772,7 +785,9 @@ func (h *Handler) createUser(c echo.Context) error {
 	}
 
 	// セッション発行
+	gm.Lock()
 	sID, err := h.generateID()
+	gm.Unlock()
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
@@ -868,7 +883,9 @@ func (h *Handler) login(c echo.Context) error {
 	if _, err = tx.Exec(query, requestAt, req.UserID); err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
+	gm.Lock()
 	sID, err := h.generateID()
+	gm.Unlock()
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
@@ -995,7 +1012,9 @@ func (h *Handler) listGacha(c echo.Context) error {
 	if _, err = h.DB.Exec(query, requestAt, userID); err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
+	gm.Lock()
 	tID, err := h.generateID()
+	gm.Unlock()
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
@@ -1144,7 +1163,9 @@ func (h *Handler) drawGacha(c echo.Context) error {
 	// プレゼントにガチャ結果を付与する
 	presents := make([]*UserPresent, 0, gachaCount)
 	for _, v := range result {
+		gm.Lock()
 		pID, err := h.generateID()
+		gm.Unlock()
 		if err != nil {
 			return errorResponse(c, http.StatusInternalServerError, err)
 		}
@@ -1390,7 +1411,9 @@ func (h *Handler) listItem(c echo.Context) error {
 	if _, err = h.DB.Exec(query, requestAt, userID); err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
+	gm.Lock()
 	tID, err := h.generateID()
+	gm.Unlock()
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
@@ -1669,7 +1692,9 @@ func (h *Handler) updateDeck(c echo.Context) error {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
 
+	gm.Lock()
 	udID, err := h.generateID()
+	gm.Unlock()
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
@@ -1881,9 +1906,6 @@ func noContentResponse(c echo.Context, status int) error {
 
 // generateID ユニークなIDを生成する
 func (h *Handler) generateID() (int64, error) {
-	gm.Lock()
-	defer gm.Unlock()
-
 	atomic.AddInt64(generatedId, 1)
 
 	return *generatedId, nil
